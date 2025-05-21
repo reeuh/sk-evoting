@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sangguniang Kabataan E-Voting System
 
-## Getting Started
+A secure and transparent electronic voting platform for Sangguniang Kabataan elections in the Philippines.
 
-First, run the development server:
+![SK E-Voting System](https://placeholder.svg?height=300&width=600)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Description
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The Sangguniang Kabataan (SK) E-Voting System is a comprehensive digital platform designed to modernize the electoral process for youth council elections in the Philippines. This system enables eligible youth voters (ages 15-30) to securely register, view candidate information, cast their votes electronically, and view real-time election results. The platform incorporates robust security measures, role-based access control, and a user-friendly interface to ensure a transparent and efficient election process.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### For Voters
+- Secure user registration with ID verification
+- Multi-step registration process with validation
+- Candidate browsing and profile viewing
+- Secure electronic voting with confirmation
+- Personal vote receipt generation
+- Real-time election results viewing
 
-## Learn More
+### For Candidates
+- Candidate profile management
+- Platform and achievement showcasing
+- Voter statistics and analytics
+- Real-time vote counting
 
-To learn more about Next.js, take a look at the following resources:
+### For Administrators
+- Comprehensive user management
+- Candidate verification and management
+- Election settings configuration
+- System monitoring and security
+- Announcement creation and publishing
+- Comprehensive reporting tools
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### For Election Officers
+- Voter verification and eligibility checking
+- Voting period management
+- Voter issue resolution
+- Polling station management
+- Voter list generation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### For Auditors
+- System audit logs review
+- Vote integrity verification
+- Security monitoring
+- Audit report generation
 
-## Deploy on Vercel
+### Security Features
+- Role-based access control
+- Secure authentication system
+- Vote encryption
+- Audit logging
+- Session management
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Technologies Used
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**:
+  - Next.js 14 (App Router)
+  - React 18
+  - Tailwind CSS
+  - ShadCN UI Components
+  - TypeScript
+  - Lucide React Icons
+
+- **Backend**:
+  - Next.js API Routes
+  - Server Actions
+  - TypeScript
+
+- **Authentication**:
+  - Custom JWT-based authentication
+  - Role-based authorization
+
+- **Styling**:
+  - Tailwind CSS
+  - Responsive design principles
+
+## Installation
+
+Follow these steps to set up the project locally:
+
+### Prerequisites
+- Node.js 18.x or higher
+- npm or yarn
+
+### Setup Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/sk-e-voting-system.git
+   cd sk-e-voting-system
