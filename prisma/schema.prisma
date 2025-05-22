@@ -71,3 +71,10 @@ model AuditLog {
   details   String?
   createdAt DateTime @default(now())
 }
+
+model Voter {
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String @unique
+  // ...other fields
+}

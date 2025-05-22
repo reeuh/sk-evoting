@@ -69,6 +69,15 @@ export default function AddUserForm({ open, onCloseAction: onClose, onAddUserAct
     }
   };
 
+  const onAddUserAction = async (user: Omit<User, "id" | "status">) => {
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    });
+    // handle response, errors, etc.
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30" onClick={onClose}>
       <div

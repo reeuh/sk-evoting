@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { prisma } from '@/lib/db'
 
 // This would be connected to a database in a real application
 export async function POST(request: Request) {

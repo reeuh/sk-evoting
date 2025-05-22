@@ -374,6 +374,15 @@ export default function RegisterPage() {
     }
   };
 
+  const handleRegister = async (voterData: any) => {
+    const response = await fetch('/api/voters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(voterData),
+    });
+    // handle response, errors, etc.
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-50 px-4 py-12">
       <Card className="w-full max-w-lg">
