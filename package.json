@@ -28,6 +28,7 @@
     "@radix-ui/react-tabs": "^1.1.12",
     "@tanstack/react-table": "^8.21.3",
     "@types/bcryptjs": "^2.4.6",
+    "@types/ws": "^8.18.1",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.511.0",
@@ -35,8 +36,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.3",
+    "sonner": "^2.0.3",
+    "swr": "^2.3.3",
     "tailwind-merge": "^3.3.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

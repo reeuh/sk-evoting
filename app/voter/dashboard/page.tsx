@@ -1,6 +1,7 @@
 "use client"
 
 import { Checkbox } from "@/components/ui/checkbox"
+import { ProtectedRoute } from "@/components/protected-routes"
 
 import { useState } from "react"
 import Link from "next/link"
@@ -21,6 +22,14 @@ import {
 } from "@/components/ui/dialog"
 
 export default function VotingPage() {
+  return (
+    <ProtectedRoute requiredPermission="cast:vote">
+      <VotingPageContent />
+    </ProtectedRoute>
+  )
+}
+
+function VotingPageContent() {
   const [selectedCandidates, setSelectedCandidates] = useState({
     chairperson: "",
     kagawad: [] as string[],

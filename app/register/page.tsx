@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,17 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type Role } from "@/lib/roles";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { toast } from "sonner";
+import { PasswordInput } from "@/components/ui/password-input";
+
+type RegistrationStatus = "pending" | "verifying" | "verified" | "rejected";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [registrationStatus, setRegistrationStatus] =
+    useState<RegistrationStatus>("pending");
+  const [verificationMessage, setVerificationMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
@@ -200,7 +207,7 @@ export default function RegisterPage() {
       setPasswordError("Password must contain at least one number");
       return false;
     }
-    if (!/[!@#$%^&*]/.test(password)) {
+    if (!/[!@#$%^&_]/.test(password)) {
       setPasswordError(
         "Password must contain at least one special character (!@#$%^&*)"
       );
@@ -298,6 +305,40 @@ export default function RegisterPage() {
     setStep(step - 1);
   };
 
+  useEffect(() => {
+    // Subscribe to WebSocket for real-time updates
+    const ws = new WebSocket(
+      process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001"
+    );
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (
+        data.type === "verification_update" &&
+        data.userId === localStorage.getItem("temp_user_id")
+      ) {
+        setRegistrationStatus(data.status);
+        setVerificationMessage(data.message);
+
+        if (data.status === "verified") {
+          toast.success("Registration Verified!", {
+            description:
+              "Your registration has been verified. You can now proceed to vote.",
+          });
+          router.push("/voter/dashboard");
+        } else if (data.status === "rejected") {
+          toast.error("Registration Rejected", {
+            description:
+              data.message ||
+              "Please contact the election officer for more information.",
+          });
+        }
+      }
+    };
+
+    return () => ws.close();
+  }, [router]);
+
   const handleSubmit = async () => {
     // Validate all fields in step 3
     const isPasswordValid = validatePassword(password);
@@ -318,6 +359,7 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     setSubmitError("");
+    setRegistrationStatus("verifying");
 
     try {
       // Create form data for file upload
@@ -348,36 +390,40 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Store user data in localStorage
-        localStorage.setItem(
-          "sk_user",
-          JSON.stringify({
-            ...data.user,
-            roles: ["voter"] as Role[],
-          })
+        // Store temporary user ID for WebSocket updates
+        localStorage.setItem("temp_user_id", data.user.id);
+
+        // Show verification pending message
+        setRegistrationStatus("verifying");
+        setVerificationMessage(
+          "Your registration is being reviewed by an election officer. This may take a few minutes."
         );
 
-        // Redirect to voter dashboard
-        router.push("/voter/dashboard");
+        toast.info("Registration Submitted", {
+          description:
+            "Please wait while an election officer verifies your information.",
+        });
       } else {
         setSubmitError(
           data.message || "Registration failed. Please try again."
         );
+        setRegistrationStatus("pending");
       }
     } catch (error) {
       console.error("Registration error:", error);
       setSubmitError(
         "An error occurred during registration. Please try again."
       );
+      setRegistrationStatus("pending");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleRegister = async (voterData: any) => {
-    const response = await fetch('/api/voters', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/voters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(voterData),
     });
     // handle response, errors, etc.
@@ -393,6 +439,40 @@ export default function RegisterPage() {
           <CardDescription className="text-center">
             Create an account to participate in the SK Elections
           </CardDescription>
+
+          {/* Registration Status Indicator */}
+          {registrationStatus !== "pending" && (
+            <div className="mt-4 p-4 rounded-lg border">
+              <div className="flex items-center space-x-2">
+                {registrationStatus === "verifying" && (
+                  <>
+                    <Clock className="h-5 w-5 text-yellow-500 animate-spin" />
+                    <span className="font-medium">
+                      Verification in Progress
+                    </span>
+                  </>
+                )}
+                {registrationStatus === "verified" && (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <span className="font-medium">Registration Verified</span>
+                  </>
+                )}
+                {registrationStatus === "rejected" && (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                    <span className="font-medium">Registration Rejected</span>
+                  </>
+                )}
+              </div>
+              {verificationMessage && (
+                <p className="mt-2 text-sm text-gray-600">
+                  {verificationMessage}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-between items-center mt-4">
             <div
               className={`h-1 flex-1 ${
@@ -603,10 +683,10 @@ export default function RegisterPage() {
               <h3 className="font-medium text-lg">Account Setup</h3>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   value={password}
+                  error={passwordError}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (passwordError) validatePassword(e.target.value);
@@ -623,10 +703,10 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
                   value={confirmPassword}
+                  error={confirmPasswordError}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
                     if (confirmPasswordError)

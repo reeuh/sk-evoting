@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { type Role } from "@/lib/roles";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -43,18 +44,26 @@ export default function LoginPage() {
         // Store the user data
         localStorage.setItem("sk_user", JSON.stringify(data.user));
 
-        // Get the user's primary role
-        const userRole = data.user.roles[0] as Role;
+        // Get the user's roles and determine the highest privilege
+        const userRoles = data.user.roles as Role[];
         let redirectPath = "/";
 
-        // Ensure role-based redirects match the Role type
-        switch (userRole) {
-          case "voter":
-            redirectPath = "/voter/dashboard";
-            break;
-          case "candidate":
-            redirectPath = "/candidate/dashboard";
-            break;
+        // Define role priority
+        const rolePriority: Record<Role, number> = {
+          administrator: 1,
+          election_officer: 2,
+          auditor: 3,
+          candidate: 4,
+          voter: 5,
+        };
+
+        // Sort roles by priority
+        const sortedRoles = userRoles.sort(
+          (a, b) => rolePriority[a] - rolePriority[b]
+        );
+        const primaryRole = sortedRoles[0];
+
+        switch (primaryRole) {
           case "administrator":
             redirectPath = "/admin/dashboard";
             break;
@@ -63,6 +72,12 @@ export default function LoginPage() {
             break;
           case "auditor":
             redirectPath = "/auditor/dashboard";
+            break;
+          case "candidate":
+            redirectPath = "/candidate/dashboard";
+            break;
+          case "voter":
+            redirectPath = "/voter/dashboard";
             break;
           default:
             redirectPath = "/";
@@ -113,9 +128,8 @@ export default function LoginPage() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
               </div>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

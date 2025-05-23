@@ -14,12 +14,24 @@ model User {
   hashedPassword String
   barangay       String
   city           String
+  province       String?
+  address        String?
+  phoneNumber    String?
+  birthDate      DateTime?
+  idType         String?
+  idFrontUrl     String?
+  idBackUrl      String?
   roles          Role[]
-  candidate      Candidate?
   votes          Vote[]
   auditLogs      AuditLog[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  age            Int?
+  verified       Boolean?       @default(false)
+  hasVoted       Boolean?       @default(false)
+  verificationStatus String?    @default("pending")
+  verificationMessage String?
 }
 
 model Role {
@@ -41,12 +53,10 @@ model Permission {
 
 model Candidate {
   id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String   @unique
+  name      String
   position  String
-  party     String
-  platform  String?
-  votes     Vote[]
+  photo     String
+  bio       String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -55,8 +65,6 @@ model Vote {
   id          String    @id @default(uuid())
   user        User      @relation(fields: [userId], references: [id])
   userId      String
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
-  candidateId String
   position    String
   createdAt   DateTime  @default(now())
 

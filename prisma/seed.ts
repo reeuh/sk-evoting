@@ -173,10 +173,10 @@ async function main() {
     if (user.roles.includes("candidate")) {
       await prisma.candidate.create({
         data: {
-          userId: createdUser.id,
+          name: user.name,
           position: "Kagawad",
-          party: "Kabataan Party",
-          platform: "Education and Youth Development",
+          photo: "/placeholder.svg?height=150&width=150",
+          bio: "Education and Youth Development",
         },
       });
     }

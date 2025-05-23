@@ -6,6 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { UserCheck, Clock, FileText, MapPin } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useState } from "react"
 
 export default function ElectionOfficerDashboard() {
   return (
@@ -17,6 +21,74 @@ export default function ElectionOfficerDashboard() {
 
 function ElectionOfficerDashboardContent() {
   const { hasPermission } = useAuth()
+  // Voter verification state
+  const [voterId, setVoterId] = useState("")
+  const [voter, setVoter] = useState<any>(null)
+  const [lookupError, setLookupError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [successMsg, setSuccessMsg] = useState("")
+
+  // Simulated eligibility check (replace with real logic/API)
+  const checkEligibility = (voter: any) => {
+    if (!voter) return false
+    // Example: must be 15-30 years old and not already verified
+    return voter.age >= 15 && voter.age <= 30 && !voter.verified
+  }
+
+  // Simulated lookup (replace with real API call)
+  const handleLookup = async () => {
+    setIsLoading(true)
+    setLookupError("")
+    setVoter(null)
+    setSuccessMsg("")
+    // Simulate API delay
+    setTimeout(() => {
+      // Example: hardcoded demo data
+      if (voterId === "12345") {
+        setVoter({
+          id: "12345",
+          name: "Juan Dela Cruz",
+          barangay: "San Jose",
+          city: "Manila",
+          age: 19,
+          verified: false,
+        })
+      } else if (voterId === "54321") {
+        setVoter({
+          id: "54321",
+          name: "Maria Santos",
+          barangay: "Sta. Cruz",
+          city: "Manila",
+          age: 32,
+          verified: false,
+        })
+      } else if (voterId === "99999") {
+        setVoter({
+          id: "99999",
+          name: "Ana Lim",
+          barangay: "San Miguel",
+          city: "Manila",
+          age: 20,
+          verified: true,
+        })
+      } else {
+        setLookupError("No voter found with that ID.")
+      }
+      setIsLoading(false)
+    }, 1000)
+  }
+
+  // Simulated verification (replace with real API call)
+  const handleConfirm = async () => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setVoter((v: any) => v ? { ...v, verified: true } : v)
+      setShowConfirm(false)
+      setSuccessMsg("Voter successfully verified.")
+      setIsLoading(false)
+    }, 1000)
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -177,11 +249,76 @@ function ElectionOfficerDashboardContent() {
                   <CardTitle>Voter Verification</CardTitle>
                   <CardDescription>Verify voter identities and eligibility</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {/* Voter verification interface would go here */}
-                  <p className="text-gray-500">
-                    Review voter registration applications, verify IDs, and approve eligible voters.
-                  </p>
+                <CardContent className="space-y-6">
+                  <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Enter Voter ID"
+                        value={voterId}
+                        onChange={e => setVoterId(e.target.value)}
+                        disabled={isLoading}
+                        aria-label="Voter ID"
+                      />
+                    </div>
+                    <Button onClick={handleLookup} disabled={!voterId || isLoading} className="bg-blue-600 hover:bg-blue-700">
+                      {isLoading ? "Looking up..." : "Lookup"}
+                    </Button>
+                  </div>
+                  {lookupError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{lookupError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {voter && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="font-medium">Name: <span className="font-normal">{voter.name}</span></p>
+                          <p className="font-medium">Barangay: <span className="font-normal">{voter.barangay}</span></p>
+                          <p className="font-medium">City: <span className="font-normal">{voter.city}</span></p>
+                          <p className="font-medium">Age: <span className="font-normal">{voter.age}</span></p>
+                        </div>
+                        <div>
+                          <p className="font-medium">Status: <span className={voter.verified ? "text-green-600" : "text-yellow-600"}>{voter.verified ? "Verified" : "Not Verified"}</span></p>
+                          <p className="font-medium">Eligibility: <span className={checkEligibility(voter) ? "text-green-600" : "text-red-600"}>{checkEligibility(voter) ? "Eligible" : "Not Eligible"}</span></p>
+                        </div>
+                      </div>
+                      {!voter.verified && checkEligibility(voter) && (
+                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowConfirm(true)}>
+                          Confirm Verification
+                        </Button>
+                      )}
+                      {voter.verified && (
+                        <Alert variant="default">
+                          <AlertDescription>This voter is already verified.</AlertDescription>
+                        </Alert>
+                      )}
+                      {!checkEligibility(voter) && !voter.verified && (
+                        <Alert variant="destructive">
+                          <AlertDescription>This voter does not meet the eligibility criteria.</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  )}
+                  {successMsg && (
+                    <Alert variant="default">
+                      <AlertDescription>{successMsg}</AlertDescription>
+                    </Alert>
+                  )}
+                  <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Confirm Verification</DialogTitle>
+                      </DialogHeader>
+                      <p>Are you sure you want to mark <span className="font-bold">{voter?.name}</span> as verified?</p>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
+                        <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirm} disabled={isLoading}>
+                          {isLoading ? "Verifying..." : "Confirm"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </TabsContent>
