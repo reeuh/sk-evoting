@@ -1,15 +1,18 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from '@/lib/db'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 
 // This would be connected to a database in a real application
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { userId, selections } = body
+    const body = await request.json();
+    const { userId, selections } = body;
 
     // Validate the vote data
     if (!userId || !selections) {
-      return NextResponse.json({ success: false, message: "Invalid vote data" }, { status: 400 })
+      return NextResponse.json(
+        { success: false, message: "Invalid vote data" },
+        { status: 400 }
+      );
     }
 
     // In a real application, you would:
@@ -21,7 +24,7 @@ export async function POST(request: Request) {
     // Generate a unique receipt number
     const receiptNumber = `SK-2025-${Math.floor(Math.random() * 1000000)
       .toString()
-      .padStart(6, "0")}`
+      .padStart(6, "0")}`;
 
     // For demo purposes, return a success response
     return NextResponse.json({
@@ -29,9 +32,12 @@ export async function POST(request: Request) {
       message: "Vote successfully recorded",
       receiptNumber: receiptNumber,
       timestamp: new Date().toISOString(),
-    })
+    });
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 })
+    return NextResponse.json(
+      { success: false, message: "Server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -39,17 +45,37 @@ export async function POST(request: Request) {
 export async function GET(req: NextRequest) {
   const voterId = req.nextUrl.searchParams.get("voterId");
   if (!voterId || typeof voterId !== "string") {
-    return NextResponse.json({ error: "Invalid or missing voterId." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid or missing voterId." },
+      { status: 400 }
+    );
   }
   try {
     const user = await prisma.user.findUnique({
       where: { id: voterId },
+      select: {
+        id: true,
+        name: true,
+        barangay: true,
+        city: true,
+        birthDate: true,
+        verified: true,
+        hasVoted: true,
+      },
     });
     if (!user) {
       return NextResponse.json({ error: "Voter not found." }, { status: 404 });
     }
+
+    // Calculate age from birthDate
+    const age = user.birthDate
+      ? Math.floor(
+          (new Date().getTime() - user.birthDate.getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000)
+        )
+      : 0;
+
     // Example eligibility: age 15-30, not verified, not voted
-    const age = user.age || 0;
     const eligible = age >= 15 && age <= 30 && !user.verified && !user.hasVoted;
     return NextResponse.json({
       id: user.id,
@@ -71,21 +97,48 @@ export async function PATCH(req: NextRequest) {
   try {
     const { voterId } = await req.json();
     if (!voterId || typeof voterId !== "string") {
-      return NextResponse.json({ error: "Invalid or missing voterId." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid or missing voterId." },
+        { status: 400 }
+      );
     }
-    const user = await prisma.user.findUnique({ where: { id: voterId } });
+    const user = await prisma.user.findUnique({
+      where: { id: voterId },
+      select: {
+        id: true,
+        birthDate: true,
+        verified: true,
+        hasVoted: true,
+      },
+    });
     if (!user) {
       return NextResponse.json({ error: "Voter not found." }, { status: 404 });
     }
+    // Calculate age from birthDate
+    const age = user.birthDate
+      ? Math.floor(
+          (new Date().getTime() - user.birthDate.getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000)
+        )
+      : 0;
     // Example eligibility: age 15-30, not verified, not voted
-    const age = user.age || 0;
     const eligible = age >= 15 && age <= 30 && !user.verified && !user.hasVoted;
     if (!eligible) {
-      return NextResponse.json({ error: "Voter is not eligible for verification." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Voter is not eligible for verification." },
+        { status: 400 }
+      );
     }
     await prisma.user.update({
       where: { id: voterId },
-      data: { verified: true },
+      data: {
+        verified: true,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        verified: true,
+      },
     });
     return NextResponse.json({ success: true });
   } catch (e) {

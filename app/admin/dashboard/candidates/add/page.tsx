@@ -80,17 +80,38 @@ export default function AddCandidatePage() {
     setErrorMsg("");
     if (!validate()) return;
     setSubmitting(true);
+
     try {
-      // Simulate API call
-      await new Promise((res) => setTimeout(res, 1000));
-      setSuccess("Candidate added successfully!");
-      setForm({ name: "", position: "", photo: null, bio: "" });
-      // Redirect to candidate list after a short delay
-      setTimeout(() => {
-        router.push("/admin/dashboard/candidates");
-      }, 1000);
+      const formData = new FormData();
+      formData.append("name", form.name);
+      formData.append("position", form.position);
+      formData.append("bio", form.bio);
+      if (form.photo) {
+        formData.append("photo", form.photo);
+      }
+
+      const response = await fetch("/api/candidates", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess("Candidate added successfully!");
+        setForm({ name: "", position: "", photo: null, bio: "" });
+        setPhotoPreview(null);
+        
+        // Redirect to candidate list after a short delay
+        setTimeout(() => {
+          router.push("/admin/dashboard/candidates");
+        }, 1000);
+      } else {
+        setErrorMsg(data.message || "Failed to add candidate. Please try again.");
+      }
     } catch (err) {
-      setErrorMsg("Failed to add candidate. Please try again.");
+      console.error("Error adding candidate:", err);
+      setErrorMsg("An error occurred. Please try again.");
     } finally {
       setSubmitting(false);
     }

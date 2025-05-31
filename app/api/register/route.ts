@@ -1,40 +1,43 @@
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hash } from "bcryptjs";
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { writeFile, mkdir } from "fs/promises";
+import { join, basename } from "path";
+import { existsSync } from "fs";
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    
-    // Extract and validate required fields
-    const firstName = formData.get("firstName") as string;
-    const lastName = formData.get("lastName") as string;
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const phoneNumber = formData.get("phoneNumber") as string;
-    const birthDate = formData.get("birthDate") as string;
-    const address = formData.get("address") as string;
-    const city = formData.get("city") as string;
-    const province = formData.get("province") as string;
-    const barangay = formData.get("barangay") as string;
-    const idType = formData.get("idType") as string;
-    const role = formData.get("role") as string;
+
+    // Extract required fields
+    const fields = [
+      "firstName", "lastName", "email", "password", "phoneNumber", "birthDate",
+      "address", "city", "province", "barangay", "idType", "role"
+    ];
+
+    const missingFields = fields.filter(key => !formData.get(key));
     const idFront = formData.get("idFront") as File;
     const idBack = formData.get("idBack") as File;
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phoneNumber || 
-        !birthDate || !address || !city || !province || !barangay || 
-        !idType || !role || !idFront || !idBack) {
+    if (missingFields.length > 0 || !idFront || !idBack) {
       return NextResponse.json(
-        { success: false, message: "All fields are required" },
+        { 
+          success: false, 
+          message: "Missing required fields: " + [
+            ...missingFields,
+            !idFront ? "idFront" : "",
+            !idBack ? "idBack" : ""
+          ].filter(Boolean).join(", ")
+        },
         { status: 400 }
       );
     }
 
-    // Check if email already exists
+    const [firstName, lastName, email, password, phoneNumber, birthDate, address, city, province, barangay, idType, role] =
+      fields.map(key => formData.get(key) as string);
+
+    // Check if email exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -54,8 +57,6 @@ export async function POST(request: Request) {
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
       age--;
     }
-
-    // Validate age
     if (age < 15 || age > 30) {
       return NextResponse.json(
         { success: false, message: "Age must be between 15 and 30 years old" },
@@ -66,41 +67,64 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Save ID images
+    // Ensure uploads directory exists
     const uploadDir = join(process.cwd(), "public", "uploads");
-    const idFrontPath = join(uploadDir, `${Date.now()}_front_${idFront.name}`);
-    const idBackPath = join(uploadDir, `${Date.now()}_back_${idBack.name}`);
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
 
+    // Sanitize filenames
+    const safeFileName = (file: File, tag: string) =>
+      `${Date.now()}_${tag}_${encodeURIComponent(file.name.replace(/\s+/g, "_"))}`;
+    const idFrontName = safeFileName(idFront, "front");
+    const idBackName = safeFileName(idBack, "back");
+    const idFrontPath = join(uploadDir, idFrontName);
+    const idBackPath = join(uploadDir, idBackName);
+
+    // Save uploads
     await writeFile(idFrontPath, Buffer.from(await idFront.arrayBuffer()));
     await writeFile(idBackPath, Buffer.from(await idBack.arrayBuffer()));
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        name: `${firstName} ${lastName}`,
-        email,
-        hashedPassword,
-        phoneNumber,
-        birthDate: new Date(birthDate),
-        address,
-        city,
-        province,
-        barangay,
-        age,
-        verified: false,
-        hasVoted: false,
-        verificationStatus: "pending",
-        roles: {
-          connect: {
-            name: role,
+    // Create user in db
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          name: `${firstName} ${lastName}`,
+          email,
+          hashedPassword,
+          phoneNumber,
+          birthDate: birthDateObj,
+          address,
+          city,
+          province,
+          barangay,
+          age,
+          verified: false,
+          hasVoted: false,
+          verificationStatus: "pending",
+          roles: {
+            connect: {
+              name: role,
+            },
           },
+          idType,
+          idFrontUrl: `/uploads/${idFrontName}`,
+          idBackUrl: `/uploads/${idBackName}`,
         },
-        // Store ID document information
-        idType,
-        idFrontUrl: idFrontPath.replace(process.cwd(), ""),
-        idBackUrl: idBackPath.replace(process.cwd(), ""),
-      },
-    });
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Foreign key constraint failed") // Example, adjust to your generated Prisma error messages
+      ) {
+        return NextResponse.json(
+          { success: false, message: "Role does not exist, ask admin to add this role first." },
+          { status: 400 }
+        );
+      }
+      throw error; // Otherwise, let it bubble up
+    }
 
     return NextResponse.json({
       success: true,
@@ -113,12 +137,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Registration error:", error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         message: "An error occurred during registration",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
-} 
+}

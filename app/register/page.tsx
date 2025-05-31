@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,16 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type Role } from "@/lib/roles";
-import { Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PasswordInput } from "@/components/ui/password-input";
 
-type RegistrationStatus = "pending" | "verifying" | "verified" | "rejected";
+type RegistrationStatus = 'pending' | 'verifying' | 'verified' | 'rejected';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [registrationStatus, setRegistrationStatus] =
-    useState<RegistrationStatus>("pending");
-  const [verificationMessage, setVerificationMessage] = useState("");
+  const [registrationStatus, setRegistrationStatus] = useState<RegistrationStatus>('pending');
+  const [verificationMessage, setVerificationMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
@@ -305,128 +304,82 @@ export default function RegisterPage() {
     setStep(step - 1);
   };
 
-  useEffect(() => {
-    // Subscribe to WebSocket for real-time updates
-    const ws = new WebSocket(
-      process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001"
-    );
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (
-        data.type === "verification_update" &&
-        data.userId === localStorage.getItem("temp_user_id")
-      ) {
-        setRegistrationStatus(data.status);
-        setVerificationMessage(data.message);
-
-        if (data.status === "verified") {
-          toast.success("Registration Verified!", {
-            description:
-              "Your registration has been verified. You can now proceed to vote.",
-          });
-          router.push("/voter/dashboard");
-        } else if (data.status === "rejected") {
-          toast.error("Registration Rejected", {
-            description:
-              data.message ||
-              "Please contact the election officer for more information.",
-          });
-        }
-      }
-    };
-
-    return () => ws.close();
-  }, [router]);
-
-  const handleSubmit = async () => {
-    // Validate all fields in step 3
-    const isPasswordValid = validatePassword(password);
-    const isConfirmPasswordValid = validateConfirmPassword(confirmPassword);
-    const isIdTypeValid = validateIdType(idType);
-    const areIdFilesValid = validateIdFiles(idFiles);
-    const areTermsAccepted = validateTerms(termsAccepted);
-
-    if (
-      !isPasswordValid ||
-      !isConfirmPasswordValid ||
-      !isIdTypeValid ||
-      !areIdFilesValid ||
-      !areTermsAccepted
-    ) {
-      return;
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setSubmitError("");
-    setRegistrationStatus("verifying");
+    setRegistrationStatus('verifying');
 
     try {
-      // Create form data for file upload
-      const formData = new FormData();
-      formData.append("firstName", firstName);
-      formData.append("lastName", lastName);
-      formData.append("email", email);
-      formData.append("password", password);
-      formData.append("phoneNumber", phoneNumber);
-      formData.append("birthDate", birthDate);
-      formData.append("address", address);
-      formData.append("city", city);
-      formData.append("province", province);
-      formData.append("barangay", barangay);
-      formData.append("idType", idType);
-      formData.append("role", "voter"); // Default role for new registrations
+      // Validate all required fields before submission
+      const isEmailValid = validateEmail(email);
+      const isPhoneValid = validatePhoneNumber(phoneNumber);
+      const isBirthDateValid = validateBirthDate(birthDate);
+      const isAddressValid = validateAddress(address);
+      const isCityValid = validateCity(city);
+      const isProvinceValid = validateProvince(province);
+      const isBarangayValid = validateBarangay(barangay);
+      const isIdTypeValid = validateIdType(idType);
+      const isPasswordValid = validatePassword(password);
+      const isConfirmPasswordValid = validateConfirmPassword(confirmPassword);
+      const isTermsValid = validateTerms(termsAccepted);
 
-      if (idFiles) {
-        formData.append("idFront", idFiles[0]);
-        formData.append("idBack", idFiles[1]);
+      if (!isEmailValid || !isPhoneValid || !isBirthDateValid || 
+          !isAddressValid || !isCityValid || !isProvinceValid || 
+          !isBarangayValid || !isIdTypeValid || !isPasswordValid || 
+          !isConfirmPasswordValid || !isTermsValid) {
+        setSubmitError("Please fill in all required fields correctly");
+        setRegistrationStatus('pending');
+        return;
       }
 
-      const response = await fetch("/api/register", {
-        method: "POST",
+      const form = e.target as HTMLFormElement;
+      const formData = new FormData(form);
+      
+      // Explicitly append all required fields to ensure they're included
+      formData.set('firstName', firstName);
+      formData.set('lastName', lastName);
+      formData.set('email', email);
+      formData.set('phoneNumber', phoneNumber);
+      formData.set('birthDate', birthDate);
+      formData.set('address', address);
+      formData.set('city', city);
+      formData.set('province', province);
+      formData.set('barangay', barangay);
+      formData.set('idType', idType);
+      formData.set('password', password);
+      formData.set('role', 'voter');
+
+      const response = await fetch('/api/register', {
+        method: 'POST',
         body: formData,
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Store temporary user ID for WebSocket updates
-        localStorage.setItem("temp_user_id", data.user.id);
-
-        // Show verification pending message
-        setRegistrationStatus("verifying");
-        setVerificationMessage(
-          "Your registration is being reviewed by an election officer. This may take a few minutes."
-        );
-
-        toast.info("Registration Submitted", {
-          description:
-            "Please wait while an election officer verifies your information.",
+        toast.success("Registration Submitted!", {
+          description: "Your registration is being processed. You will be redirected to check your status.",
         });
+        // Redirect to status page with user ID
+        router.push(`/registration-status?id=${data.user.id}`);
       } else {
-        setSubmitError(
-          data.message || "Registration failed. Please try again."
-        );
-        setRegistrationStatus("pending");
+        setSubmitError(data.message || "Registration failed. Please try again.");
+        setRegistrationStatus('pending');
+        toast.error("Registration Failed", {
+          description: data.message || "Please try again later.",
+        });
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      setSubmitError(
-        "An error occurred during registration. Please try again."
-      );
-      setRegistrationStatus("pending");
+      console.error('Registration error:', error);
+      setSubmitError("An error occurred during registration. Please try again later.");
+      setRegistrationStatus('pending');
+      toast.error("Registration Failed", {
+        description: "An unexpected error occurred. Please try again later.",
+      });
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleRegister = async (voterData: any) => {
-    const response = await fetch("/api/voters", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(voterData),
-    });
-    // handle response, errors, etc.
   };
 
   return (
@@ -441,24 +394,22 @@ export default function RegisterPage() {
           </CardDescription>
 
           {/* Registration Status Indicator */}
-          {registrationStatus !== "pending" && (
+          {registrationStatus !== 'pending' && (
             <div className="mt-4 p-4 rounded-lg border">
               <div className="flex items-center space-x-2">
-                {registrationStatus === "verifying" && (
+                {registrationStatus === 'verifying' && (
                   <>
-                    <Clock className="h-5 w-5 text-yellow-500 animate-spin" />
-                    <span className="font-medium">
-                      Verification in Progress
-                    </span>
+                    <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                    <span className="font-medium">Verification in Progress</span>
                   </>
                 )}
-                {registrationStatus === "verified" && (
+                {registrationStatus === 'verified' && (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                     <span className="font-medium">Registration Verified</span>
                   </>
                 )}
-                {registrationStatus === "rejected" && (
+                {registrationStatus === 'rejected' && (
                   <>
                     <AlertCircle className="h-5 w-5 text-red-500" />
                     <span className="font-medium">Registration Rejected</span>
@@ -466,31 +417,17 @@ export default function RegisterPage() {
                 )}
               </div>
               {verificationMessage && (
-                <p className="mt-2 text-sm text-gray-600">
-                  {verificationMessage}
-                </p>
+                <p className="mt-2 text-sm text-gray-600">{verificationMessage}</p>
               )}
             </div>
           )}
 
           <div className="flex justify-between items-center mt-4">
-            <div
-              className={`h-1 flex-1 ${
-                step >= 1 ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            ></div>
+            <div className={`h-1 flex-1 ${step >= 1 ? "bg-blue-600" : "bg-gray-200"}`}></div>
             <div className="mx-2"></div>
-            <div
-              className={`h-1 flex-1 ${
-                step >= 2 ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            ></div>
+            <div className={`h-1 flex-1 ${step >= 2 ? "bg-blue-600" : "bg-gray-200"}`}></div>
             <div className="mx-2"></div>
-            <div
-              className={`h-1 flex-1 ${
-                step >= 3 ? "bg-blue-600" : "bg-gray-200"
-              }`}
-            ></div>
+            <div className={`h-1 flex-1 ${step >= 3 ? "bg-blue-600" : "bg-gray-200"}`}></div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -500,119 +437,124 @@ export default function RegisterPage() {
             </Alert>
           )}
 
-          {step === 1 && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-lg">Personal Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="Juan"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {step === 1 && (
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Personal Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      placeholder="Juan"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      placeholder="Dela Cruz"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="lastName"
-                    placeholder="Dela Cruz"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="juan.delacruz@gmail.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) validateEmail(e.target.value);
+                    }}
                     required
                   />
+                  {emailError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{emailError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
+                  <Input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    placeholder="09123456789"
+                    value={phoneNumber}
+                    onChange={(e) => {
+                      setPhoneNumber(e.target.value);
+                      if (phoneError) validatePhoneNumber(e.target.value);
+                    }}
+                    required
+                  />
+                  {phoneError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{phoneError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthDate">Date of Birth</Label>
+                  <Input
+                    id="birthDate"
+                    name="birthDate"
+                    type="date"
+                    max={new Date().toISOString().split("T")[0]}
+                    value={birthDate}
+                    onChange={(e) => {
+                      setBirthDate(e.target.value);
+                      if (birthDateError) validateBirthDate(e.target.value);
+                    }}
+                    required
+                  />
+                  {birthDateError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{birthDateError}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="juan.delacruz@gmail.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (emailError) validateEmail(e.target.value);
-                  }}
-                  required
-                />
-                {emailError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{emailError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  placeholder="09123456789"
-                  value={phoneNumber}
-                  onChange={(e) => {
-                    setPhoneNumber(e.target.value);
-                    if (phoneError) validatePhoneNumber(e.target.value);
-                  }}
-                  required
-                />
-                {phoneError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{phoneError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="birthdate">Date of Birth</Label>
-                <Input
-                  id="birthdate"
-                  type="date"
-                  max={new Date().toISOString().split("T")[0]}
-                  value={birthDate}
-                  onChange={(e) => {
-                    setBirthDate(e.target.value);
-                    if (birthDateError) validateBirthDate(e.target.value);
-                  }}
-                  required
-                />
-                {birthDateError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{birthDateError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </div>
-          )}
+            )}
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-lg">
-                Address & Voter Information
-              </h3>
-              <div className="space-y-2">
-                <Label htmlFor="address">Complete Address</Label>
-                <Input
-                  id="address"
-                  placeholder="123 Main St, Barangay San Jose"
-                  value={address}
-                  onChange={(e) => {
-                    setAddress(e.target.value);
-                    if (addressError) validateAddress(e.target.value);
-                  }}
-                  required
-                />
-                {addressError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{addressError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            {step === 2 && (
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Address & Voter Information</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Complete Address</Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    placeholder="123 Main St, Barangay San Jose"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      if (addressError) validateAddress(e.target.value);
+                    }}
+                    required
+                  />
+                  {addressError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{addressError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">City/Municipality</Label>
                   <Input
                     id="city"
-                    placeholder="Manila"
+                    name="city"
+                    placeholder="City/Municipality"
                     value={city}
                     onChange={(e) => {
                       setCity(e.target.value);
@@ -630,7 +572,8 @@ export default function RegisterPage() {
                   <Label htmlFor="province">Province</Label>
                   <Input
                     id="province"
-                    placeholder="Metro Manila"
+                    name="province"
+                    placeholder="Province"
                     value={province}
                     onChange={(e) => {
                       setProvince(e.target.value);
@@ -644,202 +587,177 @@ export default function RegisterPage() {
                     </Alert>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="barangay">Barangay</Label>
+                  <Input
+                    id="barangay"
+                    name="barangay"
+                    placeholder="Barangay"
+                    value={barangay}
+                    onChange={(e) => {
+                      setBarangay(e.target.value);
+                      if (barangayError) validateBarangay(e.target.value);
+                    }}
+                    required
+                  />
+                  {barangayError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{barangayError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="barangay">Barangay</Label>
-                <Select
-                  value={barangay}
-                  onValueChange={(value) => {
-                    setBarangay(value);
-                    if (barangayError) validateBarangay(value);
-                  }}
-                >
-                  <SelectTrigger id="barangay">
-                    <SelectValue placeholder="Select barangay" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="barangay1">Barangay 1</SelectItem>
-                    <SelectItem value="barangay2">Barangay 2</SelectItem>
-                    <SelectItem value="barangay3">Barangay 3</SelectItem>
-                    <SelectItem value="barangay4">Barangay 4</SelectItem>
-                    <SelectItem value="barangay5">Barangay 5</SelectItem>
-                  </SelectContent>
-                </Select>
-                {barangayError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{barangayError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="precinct">Precinct Number (if known)</Label>
-                <Input id="precinct" placeholder="Optional" />
-              </div>
-            </div>
-          )}
+            )}
 
-          {step === 3 && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-lg">Account Setup</h3>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <PasswordInput
-                  id="password"
-                  value={password}
-                  error={passwordError}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (passwordError) validatePassword(e.target.value);
-                    if (confirmPassword)
-                      validateConfirmPassword(confirmPassword);
-                  }}
-                  required
-                />
-                {passwordError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{passwordError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <PasswordInput
-                  id="confirmPassword"
-                  value={confirmPassword}
-                  error={confirmPasswordError}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (confirmPasswordError)
-                      validateConfirmPassword(e.target.value);
-                  }}
-                  required
-                />
-                {confirmPasswordError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{confirmPasswordError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="idType">ID Type</Label>
-                <Select
-                  value={idType}
-                  onValueChange={(value) => {
-                    setIdType(value);
-                    if (idTypeError) validateIdType(value);
-                  }}
-                >
-                  <SelectTrigger id="idType">
-                    <SelectValue placeholder="Select ID type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="national">National ID</SelectItem>
-                    <SelectItem value="passport">Passport</SelectItem>
-                    <SelectItem value="drivers">Driver's License</SelectItem>
-                    <SelectItem value="postal">Postal ID</SelectItem>
-                    <SelectItem value="school">School ID</SelectItem>
-                  </SelectContent>
-                </Select>
-                {idTypeError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{idTypeError}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="idUpload">Upload ID (Front and Back)</Label>
-                <Input
-                  id="idUpload"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => {
-                    setIdFiles(e.target.files);
-                    if (idFilesError) validateIdFiles(e.target.files);
-                  }}
-                  required
-                />
-                {idFilesError && (
-                  <Alert variant="destructive" className="mt-2">
-                    <AlertDescription>{idFilesError}</AlertDescription>
-                  </Alert>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Please upload clear images of both sides of your ID. Max file
-                  size: 5MB each.
-                </p>
-              </div>
-              <div className="flex items-start space-x-2 pt-2">
-                <Checkbox
-                  id="terms"
-                  checked={termsAccepted}
-                  onCheckedChange={(checked) => {
-                    setTermsAccepted(checked as boolean);
-                    if (termsError) validateTerms(checked as boolean);
-                  }}
-                />
-                <Label htmlFor="terms" className="text-sm font-normal">
-                  I confirm that I am a Filipino citizen, 15-30 years old, and
-                  eligible to vote in the SK Elections. I agree to the{" "}
-                  <Link
-                    href="/terms"
-                    className="text-blue-600 hover:text-blue-800"
+            {step === 3 && (
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Account & Verification</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <PasswordInput
+                    id="password"
+                    name="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (passwordError) validatePassword(e.target.value);
+                    }}
+                    required
+                  />
+                  {passwordError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{passwordError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <PasswordInput
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (confirmPasswordError) validateConfirmPassword(e.target.value);
+                    }}
+                    required
+                  />
+                  {confirmPasswordError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{confirmPasswordError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="idType">ID Type</Label>
+                  <Select
+                    value={idType}
+                    onValueChange={(value) => {
+                      setIdType(value);
+                      if (idTypeError) validateIdType(value);
+                    }}
                   >
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    Privacy Policy
-                  </Link>
-                  .
-                </Label>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select ID type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="passport">Passport</SelectItem>
+                      <SelectItem value="drivers_license">Driver's License</SelectItem>
+                      <SelectItem value="national_id">National ID</SelectItem>
+                      <SelectItem value="student_id">Student ID</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {idTypeError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{idTypeError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>ID Images</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="idFront">Front</Label>
+                      <Input
+                        id="idFront"
+                        name="idFront"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          setIdFiles(e.target.files);
+                          if (idFilesError) validateIdFiles(e.target.files);
+                        }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="idBack">Back</Label>
+                      <Input
+                        id="idBack"
+                        name="idBack"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          setIdFiles(e.target.files);
+                          if (idFilesError) validateIdFiles(e.target.files);
+                        }}
+                        required
+                      />
+                    </div>
+                  </div>
+                  {idFilesError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{idFilesError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="terms"
+                    checked={termsAccepted}
+                    onCheckedChange={(checked) => {
+                      setTermsAccepted(checked as boolean);
+                      if (termsError) validateTerms(checked as boolean);
+                    }}
+                    required
+                  />
+                  <Label htmlFor="terms" className="text-sm">
+                    I agree to the terms and conditions
+                  </Label>
+                </div>
+                {termsError && (
+                  <Alert variant="destructive" className="mt-2">
+                    <AlertDescription>{termsError}</AlertDescription>
+                  </Alert>
+                )}
               </div>
-              {termsError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{termsError}</AlertDescription>
-                </Alert>
+            )}
+
+            <div className="flex justify-between pt-4">
+              {step > 1 && (
+                <Button type="button" variant="outline" onClick={prevStep}>
+                  Previous
+                </Button>
               )}
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          {step > 1 ? (
-            <Button variant="outline" onClick={prevStep}>
-              Back
-            </Button>
-          ) : (
-            <Link href="/">
-              <Button variant="outline">Cancel</Button>
-            </Link>
-          )}
-
-          {step < 3 ? (
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={nextStep}
-            >
-              Next
-            </Button>
-          ) : (
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Registering...
-                </>
+              {step < 3 ? (
+                <Button type="button" onClick={nextStep}>
+                  Next
+                </Button>
               ) : (
-                "Complete Registration"
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Registration"
+                  )}
+                </Button>
               )}
-            </Button>
-          )}
-        </CardFooter>
+            </div>
+          </form>
+        </CardContent>
       </Card>
     </div>
   );

@@ -2,8 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { ProtectedRoute } from "@/components/protected-routes"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +19,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAuth } from "@/lib/auth-context"
+
+interface Candidate {
+  id: string;
+  name: string;
+  position: string;
+  photo: string;
+  bio: string;
+}
 
 export default function VotingPage() {
   return (
@@ -30,6 +38,7 @@ export default function VotingPage() {
 }
 
 function VotingPageContent() {
+  const { user } = useAuth();
   const [selectedCandidates, setSelectedCandidates] = useState({
     chairperson: "",
     kagawad: [] as string[],
@@ -37,6 +46,30 @@ function VotingPageContent() {
   const [step, setStep] = useState(1)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [voteSubmitted, setVoteSubmitted] = useState(false)
+  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    fetchCandidates()
+  }, [])
+
+  const fetchCandidates = async () => {
+    try {
+      const response = await fetch("/api/candidates")
+      const data = await response.json()
+      if (data.success) {
+        setCandidates(data.candidates)
+      } else {
+        setError("Failed to fetch candidates")
+      }
+    } catch (err) {
+      console.error("Error fetching candidates:", err)
+      setError("An error occurred while fetching candidates")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleChairpersonSelect = (value: string) => {
     setSelectedCandidates({
@@ -85,6 +118,26 @@ function VotingPageContent() {
     setShowConfirmation(false)
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   if (voteSubmitted) {
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
@@ -123,10 +176,13 @@ function VotingPageContent() {
     )
   }
 
+  const chairpersonCandidates = candidates.filter(c => c.position === "Chairperson")
+  const kagawadCandidates = candidates.filter(c => c.position === "Kagawad")
+
   return (
     <div className="min-h-screen bg-blue-50">
-      <header className="bg-white shadow">
-        <div className="container mx-auto py-4">
+      <header className="bg-white shadow-sm mb-6">
+        <div className="container mx-auto py-4 px-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
               <svg
@@ -148,18 +204,20 @@ function VotingPageContent() {
               <span className="text-xl font-bold text-blue-600">SK E-Voting</span>
             </Link>
             <div>
-              <p className="text-sm font-medium">Voter: Juan Dela Cruz</p>
-              <p className="text-xs text-gray-500">Barangay San Jose, Manila</p>
+              <p className="text-sm font-medium">Voter: {user?.name || 'Loading...'}</p>
+              <p className="text-xs text-gray-500">
+                {user?.barangay && user?.city ? `${user.barangay}, ${user.city}` : 'Loading...'}
+              </p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto py-8 px-4">
-        <Card className="max-w-4xl mx-auto">
-          <CardHeader>
+      <main className="container mx-auto px-4 pb-12">
+        <Card className="max-w-4xl mx-auto shadow-md my-8">
+          <CardHeader className="space-y-4 pb-6">
             <div className="flex justify-between items-center">
-              <CardTitle>Official Ballot</CardTitle>
+              <CardTitle className="text-2xl">Official Ballot</CardTitle>
               <Badge variant="outline" className="bg-blue-50">
                 SK Elections 2025
               </Badge>
@@ -173,59 +231,31 @@ function VotingPageContent() {
               <div className={`h-2 flex-1 ${step >= 3 ? "bg-blue-600" : "bg-gray-200"}`}></div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-8 px-8">
             {step === 1 && (
               <div className="space-y-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="font-bold text-lg text-blue-900 mb-2">SK Chairperson</h3>
-                  <p className="text-sm text-gray-600 mb-4">Select ONE (1) candidate</p>
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h3 className="font-bold text-lg text-blue-900 mb-3">SK Chairperson</h3>
+                  <p className="text-sm text-gray-600 mb-6">Select ONE (1) candidate</p>
 
                   <RadioGroup value={selectedCandidates.chairperson} onValueChange={handleChairpersonSelect}>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
-                        <RadioGroupItem value="maria-santos" id="maria-santos" />
-                        <Label htmlFor="maria-santos" className="flex flex-1 items-center gap-4 cursor-pointer">
-                          <img
-                            src="/placeholder.svg?height=50&width=50"
-                            alt="Maria Santos"
-                            className="h-12 w-12 rounded-full object-cover"
-                          />
-                          <div>
-                            <p className="font-medium">Maria Santos</p>
-                            <p className="text-sm text-gray-500">Kabataan Party</p>
-                          </div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
-                        <RadioGroupItem value="juan-reyes" id="juan-reyes" />
-                        <Label htmlFor="juan-reyes" className="flex flex-1 items-center gap-4 cursor-pointer">
-                          <img
-                            src="/placeholder.svg?height=50&width=50"
-                            alt="Juan Reyes"
-                            className="h-12 w-12 rounded-full object-cover"
-                          />
-                          <div>
-                            <p className="font-medium">Juan Reyes</p>
-                            <p className="text-sm text-gray-500">Bagong Kabataan</p>
-                          </div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
-                        <RadioGroupItem value="ana-lim" id="ana-lim" />
-                        <Label htmlFor="ana-lim" className="flex flex-1 items-center gap-4 cursor-pointer">
-                          <img
-                            src="/placeholder.svg?height=50&width=50"
-                            alt="Ana Lim"
-                            className="h-12 w-12 rounded-full object-cover"
-                          />
-                          <div>
-                            <p className="font-medium">Ana Lim</p>
-                            <p className="text-sm text-gray-500">Progresibong Kabataan</p>
-                          </div>
-                        </Label>
-                      </div>
+                    <div className="space-y-4">
+                      {chairpersonCandidates.map((candidate) => (
+                        <div key={candidate.id} className="flex items-center space-x-3 border rounded-lg p-4 hover:bg-gray-50">
+                          <RadioGroupItem value={candidate.id} id={candidate.id} />
+                          <Label htmlFor={candidate.id} className="flex flex-1 items-center gap-4 cursor-pointer">
+                            <img
+                              src={candidate.photo || "/placeholder.svg?height=50&width=50"}
+                              alt={candidate.name}
+                              className="h-14 w-14 rounded-full object-cover"
+                            />
+                            <div>
+                              <p className="font-medium text-lg">{candidate.name}</p>
+                              <p className="text-sm text-gray-500 mt-1">{candidate.bio}</p>
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
                     </div>
                   </RadioGroup>
                 </div>
@@ -234,29 +264,18 @@ function VotingPageContent() {
 
             {step === 2 && (
               <div className="space-y-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="font-bold text-lg text-blue-900 mb-2">SK Kagawad</h3>
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h3 className="font-bold text-lg text-blue-900 mb-3">SK Kagawad</h3>
                   <p className="text-sm text-gray-600 mb-2">Select up to SEVEN (7) candidates</p>
-                  <p className="text-sm font-medium text-blue-600 mb-4">
+                  <p className="text-sm font-medium text-blue-600 mb-6">
                     Selected: {selectedCandidates.kagawad.length}/7
                   </p>
 
-                  <div className="space-y-3">
-                    {[
-                      { id: "carlo-mendoza", name: "Carlo Mendoza", party: "Kabataan Party" },
-                      { id: "bianca-tan", name: "Bianca Tan", party: "Bagong Kabataan" },
-                      { id: "miguel-garcia", name: "Miguel Garcia", party: "Progresibong Kabataan" },
-                      { id: "sophia-cruz", name: "Sophia Cruz", party: "Kabataan Party" },
-                      { id: "gabriel-santos", name: "Gabriel Santos", party: "Bagong Kabataan" },
-                      { id: "isabella-reyes", name: "Isabella Reyes", party: "Progresibong Kabataan" },
-                      { id: "rafael-lim", name: "Rafael Lim", party: "Kabataan Party" },
-                      { id: "andrea-gonzales", name: "Andrea Gonzales", party: "Bagong Kabataan" },
-                      { id: "marco-tan", name: "Marco Tan", party: "Progresibong Kabataan" },
-                      { id: "patricia-mendoza", name: "Patricia Mendoza", party: "Kabataan Party" },
-                    ].map((candidate) => (
+                  <div className="space-y-4">
+                    {kagawadCandidates.map((candidate) => (
                       <div
                         key={candidate.id}
-                        className={`flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50 ${
+                        className={`flex items-center space-x-3 border rounded-lg p-4 hover:bg-gray-50 ${
                           isKagawadSelected(candidate.id) ? "border-blue-500 bg-blue-50" : ""
                         }`}
                         onClick={() => handleKagawadSelect(candidate.id)}
@@ -268,13 +287,13 @@ function VotingPageContent() {
                         />
                         <Label htmlFor={candidate.id} className="flex flex-1 items-center gap-4 cursor-pointer">
                           <img
-                            src="/placeholder.svg?height=50&width=50"
+                            src={candidate.photo || "/placeholder.svg?height=50&width=50"}
                             alt={candidate.name}
-                            className="h-12 w-12 rounded-full object-cover"
+                            className="h-14 w-14 rounded-full object-cover"
                           />
                           <div>
-                            <p className="font-medium">{candidate.name}</p>
-                            <p className="text-sm text-gray-500">{candidate.party}</p>
+                            <p className="font-medium text-lg">{candidate.name}</p>
+                            <p className="text-sm text-gray-500 mt-1">{candidate.bio}</p>
                           </div>
                         </Label>
                       </div>
@@ -286,31 +305,30 @@ function VotingPageContent() {
 
             {step === 3 && (
               <div className="space-y-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="font-bold text-lg text-blue-900 mb-4">Review Your Selections</h3>
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h3 className="font-bold text-lg text-blue-900 mb-6">Review Your Selections</h3>
 
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     <div>
-                      <h4 className="font-medium mb-2">SK Chairperson</h4>
+                      <h4 className="font-medium text-lg mb-3">SK Chairperson</h4>
                       {selectedCandidates.chairperson ? (
-                        <div className="flex items-center gap-3 p-3 border rounded-lg bg-white">
-                          <img
-                            src="/placeholder.svg?height=50&width=50"
-                            alt="Selected Chairperson"
-                            className="h-10 w-10 rounded-full object-cover"
-                          />
-                          <div>
-                            <p className="font-medium">
-                              {selectedCandidates.chairperson === "maria-santos" && "Maria Santos"}
-                              {selectedCandidates.chairperson === "juan-reyes" && "Juan Reyes"}
-                              {selectedCandidates.chairperson === "ana-lim" && "Ana Lim"}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {selectedCandidates.chairperson === "maria-santos" && "Kabataan Party"}
-                              {selectedCandidates.chairperson === "juan-reyes" && "Bagong Kabataan"}
-                              {selectedCandidates.chairperson === "ana-lim" && "Progresibong Kabataan"}
-                            </p>
-                          </div>
+                        <div className="flex items-center gap-4 p-4 border rounded-lg bg-white">
+                          {(() => {
+                            const candidate = chairpersonCandidates.find(c => c.id === selectedCandidates.chairperson)
+                            return candidate ? (
+                              <>
+                                <img
+                                  src={candidate.photo || "/placeholder.svg?height=50&width=50"}
+                                  alt={candidate.name}
+                                  className="h-16 w-16 rounded-full object-cover"
+                                />
+                                <div>
+                                  <p className="font-medium text-lg">{candidate.name}</p>
+                                  <p className="text-sm text-gray-500 mt-1">{candidate.bio}</p>
+                                </div>
+                              </>
+                            ) : null
+                          })()}
                         </div>
                       ) : (
                         <Alert variant="destructive">
@@ -322,47 +340,24 @@ function VotingPageContent() {
                     </div>
 
                     <div>
-                      <h4 className="font-medium mb-2">SK Kagawad ({selectedCandidates.kagawad.length}/7)</h4>
+                      <h4 className="font-medium text-lg mb-3">SK Kagawad ({selectedCandidates.kagawad.length}/7)</h4>
                       {selectedCandidates.kagawad.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {selectedCandidates.kagawad.map((id) => {
-                            const candidateInfo: { name: string; party: string } = {
-                              "carlo-mendoza": { name: "Carlo Mendoza", party: "Kabataan Party" },
-                              "bianca-tan": { name: "Bianca Tan", party: "Bagong Kabataan" },
-                              "miguel-garcia": { name: "Miguel Garcia", party: "Progresibong Kabataan" },
-                              "sophia-cruz": { name: "Sophia Cruz", party: "Kabataan Party" },
-                              "gabriel-santos": { name: "Gabriel Santos", party: "Bagong Kabataan" },
-                              "isabella-reyes": { name: "Isabella Reyes", party: "Progresibong Kabataan" },
-                              "rafael-lim": { name: "Rafael Lim", party: "Kabataan Party" },
-                              "andrea-gonzales": { name: "Andrea Gonzales", party: "Bagong Kabataan" },
-                              "marco-tan": { name: "Marco Tan", party: "Progresibong Kabataan" },
-                              "patricia-mendoza": { name: "Patricia Mendoza", party: "Kabataan Party" },
-                            }[id as keyof {
-                              "carlo-mendoza": { name: string; party: string };
-                              "bianca-tan": { name: string; party: string };
-                              "miguel-garcia": { name: string; party: string };
-                              "sophia-cruz": { name: string; party: string };
-                              "gabriel-santos": { name: string; party: string };
-                              "isabella-reyes": { name: string; party: string };
-                              "rafael-lim": { name: string; party: string };
-                              "andrea-gonzales": { name: string; party: string };
-                              "marco-tan": { name: string; party: string };
-                              "patricia-mendoza": { name: string; party: string };
-                            }] || { name: "Unknown", party: "Unknown" }
-
-                            return (
-                              <div key={id} className="flex items-center gap-3 p-2 border rounded-lg bg-white">
+                            const candidate = kagawadCandidates.find(c => c.id === id)
+                            return candidate ? (
+                              <div key={id} className="flex items-center gap-4 p-4 border rounded-lg bg-white">
                                 <img
-                                  src="/placeholder.svg?height=40&width=40"
-                                  alt="Selected Kagawad"
-                                  className="h-8 w-8 rounded-full object-cover"
+                                  src={candidate.photo || "/placeholder.svg?height=40&width=40"}
+                                  alt={candidate.name}
+                                  className="h-12 w-12 rounded-full object-cover"
                                 />
                                 <div>
-                                  <p className="font-medium">{candidateInfo?.name}</p>
-                                  <p className="text-xs text-gray-500">{candidateInfo?.party}</p>
+                                  <p className="font-medium text-lg">{candidate.name}</p>
+                                  <p className="text-sm text-gray-500 mt-1">{candidate.bio}</p>
                                 </div>
                               </div>
-                            )
+                            ) : null
                           })}
                         </div>
                       ) : (
@@ -378,7 +373,7 @@ function VotingPageContent() {
               </div>
             )}
           </CardContent>
-          <CardFooter className="flex justify-between">
+          <CardFooter className="flex justify-between px-8 py-6 border-t">
             {step > 1 ? (
               <Button variant="outline" onClick={prevStep}>
                 Back
