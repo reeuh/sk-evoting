@@ -1,65 +1,61 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
+interface Candidate {
+  id: string;
+  name: string;
+  position: string;
+  photo: string;
+  bio: string;
+  createdAt: string;
+}
+
 export default function CandidatesPage() {
-  const candidates = [
-    {
-      id: 1,
-      name: "Maria Santos",
-      position: "SK Chairperson",
-      party: "Kabataan Party",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Youth empowerment, education, and community development",
-      achievements: ["Student Council President", "Youth Leadership Award", "Community Service Volunteer"],
-    },
-    {
-      id: 2,
-      name: "Juan Reyes",
-      position: "SK Chairperson",
-      party: "Bagong Kabataan",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Sports development, anti-drug campaign, and environmental protection",
-      achievements: ["Varsity Team Captain", "Environmental Advocate", "Peer Counselor"],
-    },
-    {
-      id: 3,
-      name: "Ana Lim",
-      position: "SK Chairperson",
-      party: "Progresibong Kabataan",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Digital literacy, mental health awareness, and youth entrepreneurship",
-      achievements: ["Tech Club Founder", "Mental Health Advocate", "Young Entrepreneur"],
-    },
-    {
-      id: 4,
-      name: "Carlo Mendoza",
-      position: "SK Kagawad",
-      party: "Kabataan Party",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Sports programs and youth health initiatives",
-      achievements: ["Basketball Team Captain", "Health Volunteer", "Youth Leader"],
-    },
-    {
-      id: 5,
-      name: "Bianca Tan",
-      position: "SK Kagawad",
-      party: "Bagong Kabataan",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Arts and culture programs for youth",
-      achievements: ["Arts Club President", "Cultural Ambassador", "Community Theater Director"],
-    },
-    {
-      id: 6,
-      name: "Miguel Garcia",
-      position: "SK Kagawad",
-      party: "Progresibong Kabataan",
-      image: "/placeholder.svg?height=150&width=150",
-      platform: "Educational support and scholarship programs",
-      achievements: ["Honor Student", "Peer Tutor", "Scholarship Foundation Volunteer"],
-    },
-  ]
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
+
+  const fetchCandidates = async () => {
+    try {
+      const response = await fetch("/api/candidates");
+      const data = await response.json();
+      if (data.success) {
+        setCandidates(data.candidates);
+      } else {
+        setError("Failed to fetch candidates");
+      }
+    } catch (err) {
+      console.error("Error fetching candidates:", err);
+      setError("An error occurred while fetching candidates");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-blue-50">
@@ -110,7 +106,7 @@ export default function CandidatesPage() {
             <Card key={candidate.id} className="overflow-hidden">
               <div className="aspect-square relative bg-gray-100 flex items-center justify-center">
                 <img
-                  src={candidate.image || "/placeholder.svg"}
+                  src={candidate.photo || "/placeholder.svg"}
                   alt={candidate.name}
                   className="object-cover"
                   width={150}
@@ -123,23 +119,12 @@ export default function CandidatesPage() {
                     <CardTitle>{candidate.name}</CardTitle>
                     <CardDescription>{candidate.position}</CardDescription>
                   </div>
-                  <Badge variant="outline" className="bg-blue-50">
-                    {candidate.party}
-                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-sm mb-1">Platform:</h4>
-                  <p className="text-sm text-gray-600">{candidate.platform}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-sm mb-1">Achievements:</h4>
-                  <ul className="text-sm text-gray-600 list-disc pl-5">
-                    {candidate.achievements.map((achievement, index) => (
-                      <li key={index}>{achievement}</li>
-                    ))}
-                  </ul>
+                  <h4 className="font-medium text-sm mb-1">Bio:</h4>
+                  <p className="text-sm text-gray-600">{candidate.bio}</p>
                 </div>
               </CardContent>
               <CardFooter>
