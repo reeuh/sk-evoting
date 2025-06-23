@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 // Example initial users (replace with real data source in production)
 const initialUsers: User[] = [
   {
-    id: uuidv4(),
+    id: "1",
     name: "Juan Dela Cruz",
     email: "juan@example.com",
     phone: "09171234567",
@@ -19,7 +19,7 @@ const initialUsers: User[] = [
     status: "Active",
   },
   {
-    id: uuidv4(),
+    id: "2",
     name: "Maria Santos",
     email: "maria@example.com",
     phone: "09181234567",
@@ -28,7 +28,7 @@ const initialUsers: User[] = [
     status: "Active",
   },
   {
-    id: uuidv4(),
+    id: "3",
     name: "Carlos Reyes",
     email: "carlos@example.com",
     phone: "09191234567",
@@ -50,7 +50,7 @@ export default function UserManagementPage() {
   const handleAddUser = (user: Omit<User, "id" | "status">) => {
     setUsers(prev => [
       ...prev,
-      { ...user, id: uuidv4(), status: "Active" },
+      { ...user, id: typeof window !== 'undefined' ? uuidv4() : String(prev.length + 1), status: "Active" },
     ]);
   };
 

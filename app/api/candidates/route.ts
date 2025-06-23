@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
-import { existsSync } from "fs"
+import { getCurrentUser } from "@/lib/auth"
+
+// Extend the session type to include user id
+declare module "next-auth" {
+  interface Session {
+    user: User & {
+      id: string;
+      roles?: string[];
+    };
+  }
+}
 
 // GET: Fetch all candidates
 export async function GET() {
   try {
     const candidates = await prisma.candidate.findMany({
-      orderBy: {
-        position: "asc",
-      },
+      orderBy: { createdAt: "desc" },
     })
-    return NextResponse.json({
-      success: true,
-      candidates,
-    })
+    return NextResponse.json({ success: true, candidates })
   } catch (error) {
     console.error("Error fetching candidates:", error)
     return NextResponse.json(
@@ -28,56 +31,53 @@ export async function GET() {
 // POST: Add a new candidate
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData()
-    const name = formData.get("name") as string
-    const position = formData.get("position") as string
-    const bio = formData.get("bio") as string
-    const photo = formData.get("photo") as File
+    const user = await getCurrentUser();
 
-    if (!name || !position || !bio || !photo) {
+    // Diagnostic log
+    console.log("Current user from session:", user);
+
+    if (!user) {
+      console.error("User not found or session invalid. Check NEXTAUTH_SECRET environment variable.");
       return NextResponse.json(
-        { success: false, message: "All fields are required" },
-        { status: 400 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has required permission
+    const hasPermission = user.roles.some(role => 
+      role.permissions.some(permission => permission.name === 'manage:all_candidates')
+    );
+
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, message: "Insufficient permissions" },
+        { status: 403 }
       )
     }
 
-    // Ensure uploads directory exists
-    const uploadDir = join(process.cwd(), "public", "uploads", "candidates")
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
+    // Parse FormData
+    const formData = await request.formData();
+    const name = formData.get('name') as string;
+    const position = formData.get('position') as string;
+    const bio = formData.get('bio') as string;
+    // For now, just store an empty string for photo
+    // You can implement file upload logic here if needed
 
-    // Generate unique filename
-    const timestamp = Date.now()
-    const filename = `${timestamp}_${photo.name.replace(/\s+/g, "_")}`
-    const filePath = join(uploadDir, filename)
-
-    // Save photo
-    await writeFile(filePath, Buffer.from(await photo.arrayBuffer()))
-
-    // Create candidate in database
     const candidate = await prisma.candidate.create({
       data: {
         name,
         position,
+        photo: '', // handle file upload and set the path here
         bio,
-        photo: `/uploads/candidates/${filename}`,
       },
     })
 
-    return NextResponse.json({
-      success: true,
-      candidate: {
-        id: candidate.id,
-        name: candidate.name,
-        position: candidate.position,
-        photo: candidate.photo,
-      },
-    })
+    return NextResponse.json({ success: true, candidate })
   } catch (error) {
-    console.error("Error adding candidate:", error)
+    console.error("Error creating candidate:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to add candidate" },
+      { success: false, message: "Failed to create candidate" },
       { status: 500 }
     )
   }

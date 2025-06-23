@@ -13,7 +13,6 @@ interface Candidate {
   position: string;
   photo: string;
   bio: string;
-  status: "active" | "inactive";
   createdAt: string;
 }
 
@@ -41,25 +40,6 @@ export default function CandidatesPage() {
       setError("An error occurred while fetching candidates");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this candidate?")) return;
-
-    try {
-      const response = await fetch(`/api/candidates/${id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCandidates((prev) => prev.filter((c) => c.id !== id));
-      } else {
-        alert(data.message || "Failed to delete candidate");
-      }
-    } catch (err) {
-      console.error("Error deleting candidate:", err);
-      alert("An error occurred while deleting the candidate");
     }
   };
 
@@ -117,7 +97,7 @@ export default function CandidatesPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => handleDelete(candidate.id)}
+                  onClick={() => router.push(`/admin/dashboard/candidates/delete/${candidate.id}`)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

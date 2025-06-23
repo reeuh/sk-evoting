@@ -23,6 +23,8 @@ export default function RegistrationStatusPage() {
       return;
     }
 
+    let websocket: WebSocket | null = null;
+
     const checkStatus = async () => {
       try {
         const response = await fetch(`/api/verifications/${userId}`);
@@ -56,13 +58,39 @@ export default function RegistrationStatusPage() {
       }
     };
 
-    // Initial check
+    // Only run WebSocket code on the client side
+    if (typeof window !== 'undefined') {
+      // Connect to WebSocket
+      websocket = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
+      
+      websocket.onopen = () => {
+        // Use a stable ID based on userId instead of Date.now()
+        websocket?.send(JSON.stringify({
+          type: 'register',
+          userId: `user_${userId}`
+        }));
+      };
+
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_registration') {
+          checkStatus();
+        }
+      };
+    }
+
+    // Initial status check
     checkStatus();
 
-    // Poll for updates every 30 seconds
-    const interval = setInterval(checkStatus, 30000);
+    // Set up polling
+    const pollInterval = setInterval(checkStatus, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (websocket) {
+        websocket.close();
+      }
+      clearInterval(pollInterval);
+    };
   }, [userId, router]);
 
   if (!userId) {

@@ -159,10 +159,7 @@ function VotingPageContent() {
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertTitle>Receipt Number</AlertTitle>
               <AlertDescription className="font-mono">
-                SK-2025-
-                {Math.floor(Math.random() * 1000000)
-                  .toString()
-                  .padStart(6, "0")}
+                SK-2025-{user?.id.slice(0, 6).padStart(6, "0")}
               </AlertDescription>
             </Alert>
           </CardContent>

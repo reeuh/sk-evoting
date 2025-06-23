@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { type Role } from "@/lib/roles";
 import { PasswordInput } from "@/components/ui/password-input";
+import { signIn, useSession } from "next-auth/react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -25,74 +26,28 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoggingIn(true);
 
-    try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Store the user data
-        localStorage.setItem("sk_user", JSON.stringify(data.user));
-
-        // Get the user's roles and determine the highest privilege
-        const userRoles = data.user.roles as Role[];
-        let redirectPath = "/";
-
-        // Define role priority
-        const rolePriority: Record<Role, number> = {
-          administrator: 1,
-          election_officer: 2,
-          auditor: 3,
-          candidate: 4,
-          voter: 5,
-        };
-
-        // Sort roles by priority
-        const sortedRoles = userRoles.sort(
-          (a, b) => rolePriority[a] - rolePriority[b]
-        );
-        const primaryRole = sortedRoles[0];
-
-        switch (primaryRole) {
-          case "administrator":
-            redirectPath = "/admin/dashboard";
-            break;
-          case "election_officer":
-            redirectPath = "/election-officer/dashboard";
-            break;
-          case "auditor":
-            redirectPath = "/auditor/dashboard";
-            break;
-          case "candidate":
-            redirectPath = "/candidate/dashboard";
-            break;
-          case "voter":
-            redirectPath = "/voter/dashboard";
-            break;
-          default:
-            redirectPath = "/";
-        }
-
-        router.push(redirectPath);
-      } else {
-        setError(data.message || "Invalid email or password");
-      }
-    } catch (err) {
-      setError("An error occurred during login. Please try again.");
-      console.error("Login error:", err);
-    } finally {
+    if (res?.error) {
+      setError(res.error);
       setIsLoggingIn(false);
+      return;
     }
+
+    // Optionally, fetch user roles and redirect accordingly
+    router.push("/admin/dashboard");
+    setIsLoggingIn(false);
   };
 
   return (

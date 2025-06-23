@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { type Role, type Permission, userHasPermission } from "@/lib/roles";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 type User = {
   id: string;
@@ -30,72 +31,30 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem("sk_user");
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          // Ensure roles are properly typed
-          if (userData && Array.isArray(userData.roles)) {
-            userData.roles = userData.roles.map(
-              (role: string) => role.toLowerCase() as Role
-            );
-          }
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error("Authentication error:", error);
-      } finally {
-        setIsLoading(false);
+  const { data: session, status } = useSession();
+  const sessionUser = session?.user as any;
+  const user: User | null = sessionUser
+    ? {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        roles: Array.isArray(sessionUser.roles)
+          ? sessionUser.roles.map((role: string) => role.toLowerCase() as Role)
+          : ["voter"],
+        hasVoted: sessionUser.hasVoted || false,
+        barangay: sessionUser.barangay,
+        city: sessionUser.city,
       }
-    };
-
-    checkAuth();
-  }, []);
+    : null;
+  const isLoading = status === "loading";
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const userData: User = {
-          id: data.user.id,
-          name: data.user.name,
-          email: data.user.email,
-          roles: Array.isArray(data.user.roles)
-            ? data.user.roles.map((role: string) => role.toLowerCase() as Role)
-            : ["voter"], // Default to voter if no roles specified
-          hasVoted: data.user.hasVoted || false,
-          barangay: data.user.barangay,
-          city: data.user.city,
-        };
-        setUser(userData);
-        localStorage.setItem("sk_user", JSON.stringify(userData));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Login error:", error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await signIn("credentials", { redirect: false, email, password });
+    return !res?.error;
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("sk_user");
+    signOut();
   };
 
   const hasPermission = (permission: Permission): boolean => {

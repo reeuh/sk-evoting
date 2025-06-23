@@ -83,6 +83,22 @@ export default function RegisterPage() {
     return age;
   };
 
+  // Get max date for date input (must be at least 15 years old)
+  const getMaxDate = () => {
+    const today = new Date();
+    const maxDate = new Date();
+    maxDate.setFullYear(today.getFullYear() - 15);
+    return maxDate.toISOString().split('T')[0];
+  };
+
+  // Get min date for date input (must be under 31 years old)
+  const getMinDate = () => {
+    const today = new Date();
+    const minDate = new Date();
+    minDate.setFullYear(today.getFullYear() - 30);
+    return minDate.toISOString().split('T')[0];
+  };
+
   const validateEmail = (email: string) => {
     if (!email) {
       setEmailError("Email is required");
@@ -510,7 +526,8 @@ export default function RegisterPage() {
                     id="birthDate"
                     name="birthDate"
                     type="date"
-                    max={new Date().toISOString().split("T")[0]}
+                    max={getMaxDate()}
+                    min={getMinDate()}
                     value={birthDate}
                     onChange={(e) => {
                       setBirthDate(e.target.value);

@@ -35,49 +35,53 @@ export default function VerificationsPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    // Connect to WebSocket
-    const websocket = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
-    
-    websocket.onopen = () => {
-      // Identify as election officer
-      websocket.send(JSON.stringify({
-        type: 'register',
-        userId: `officer_${Date.now()}`
-      }));
-    };
+    let websocket: WebSocket | null = null;
 
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'new_registration') {
-        // Fetch updated verification requests
-        fetchVerificationRequests();
+    const fetchVerificationRequests = async () => {
+      try {
+        const response = await fetch('/api/verifications');
+        const data = await response.json();
+        setRequests(data.requests);
+      } catch (error) {
+        console.error('Error fetching verification requests:', error);
+        toast.error("Error", {
+          description: "Failed to fetch verification requests",
+        });
+      } finally {
+        setLoading(false);
       }
     };
 
-    setWs(websocket);
+    // Only run WebSocket code on the client side
+    if (typeof window !== 'undefined') {
+      // Connect to WebSocket
+      websocket = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001');
+      
+      websocket.onopen = () => {
+        // Use a stable ID for the officer
+        websocket?.send(JSON.stringify({
+          type: 'register',
+          userId: 'election_officer'
+        }));
+      };
+
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_registration') {
+          fetchVerificationRequests();
+        }
+      };
+    }
 
     // Initial fetch
     fetchVerificationRequests();
 
     return () => {
-      websocket.close();
+      if (websocket) {
+        websocket.close();
+      }
     };
   }, []);
-
-  const fetchVerificationRequests = async () => {
-    try {
-      const response = await fetch('/api/verifications');
-      const data = await response.json();
-      setRequests(data.requests);
-    } catch (error) {
-      console.error('Error fetching verification requests:', error);
-      toast.error("Error", {
-        description: "Failed to fetch verification requests",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleVerification = async (requestId: string, status: 'verified' | 'rejected', message?: string) => {
     if (!ws) return;
@@ -130,7 +134,7 @@ export default function VerificationsPage() {
                   <CardDescription>{request.email}</CardDescription>
                 </div>
                 <Badge variant={
-                  request.status === 'verified' ? 'success' :
+                  request.status === 'verified' ? 'secondary' :
                   request.status === 'rejected' ? 'destructive' :
                   'default'
                 }>

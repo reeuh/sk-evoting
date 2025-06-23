@@ -55,6 +55,7 @@ async function main() {
         "manage:permissions",
         "view:results",
         "generate:reports",
+        "manage:all_candidates",
       ],
     },
     {
